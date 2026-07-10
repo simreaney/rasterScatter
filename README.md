@@ -40,7 +40,9 @@ This plugin opens a simple dialog that:
 
 ## Install
 
-Copy the repository folder into your QGIS plugin directory, then enable it from the Plugin Manager.
+There are two ways to install this plugin:
+1. Download the 'rasterScatter.zip' file from this repository and then use the 'Install from zip' function in the QGIS plugins dialogue.
+2. Copy the repository folder into your QGIS plugin directory, then enable it from the Plugin Manager.
 
 ## Packaging
 
