@@ -12,7 +12,12 @@ This plugin opens a simple dialog that:
 
 ## Screenshots
 
-### Scatter Plot
+### User Interface and Scatter Plot
+
+![user interface and scatter plot](img/rasterScatterOverview.png)
+
+
+### 2D Histogram (Hexagon Bins)
 
 ![Scatter plot view](img/raster_scatter_plot.png)
 
