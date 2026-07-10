@@ -1,4 +1,4 @@
-# Raster Scatter Plot QGIS Plugin
+# Raster Scatter QGIS Plugin
 
 This plugin opens a simple dialog that:
 
@@ -10,43 +10,19 @@ This plugin opens a simple dialog that:
 6. Lets you save the current figure as a PNG image.
 7. Fits a linear regression and displays the equation and $R^2$ value.
 
-## Screenshots Carousel
+## Screenshots
 
-Use the links below to move between slides.
+### Scatter Plot
 
-<p align="center">
-	<a href="#slide-1">1</a> • <a href="#slide-2">2</a> • <a href="#slide-3">3</a>
-</p>
+![Scatter plot view](img/raster_scatter_plot.png)
 
-### Slide 1
+### 2D Histogram (Square Bins)
 
-<p id="slide-1" align="center">
-	<img src="img/raster_scatter_plot.png" alt="Scatter plot view" width="900" />
-</p>
+![2D histogram with square bins](img/raster_scatter_plot_sq_bins.png)
 
-<p align="center">
-	<a href="#slide-3">Prev</a> | <a href="#slide-2">Next</a>
-</p>
+### 3D Histogram
 
-### Slide 2
-
-<p id="slide-2" align="center">
-	<img src="img/raster_scatter_plot_sq_bins.png" alt="2D histogram with square bins" width="900" />
-</p>
-
-<p align="center">
-	<a href="#slide-1">Prev</a> | <a href="#slide-3">Next</a>
-</p>
-
-### Slide 3
-
-<p id="slide-3" align="center">
-	<img src="img/raster_scatter_plot_3D_histo.png" alt="3D histogram view" width="900" />
-</p>
-
-<p align="center">
-	<a href="#slide-2">Prev</a> | <a href="#slide-1">Back to start</a>
-</p>
+![3D histogram view](img/raster_scatter_plot_3D_histo.png)
 
 
 ## Notes
