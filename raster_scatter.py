@@ -2,7 +2,7 @@ import os
 
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import QgsProject
+
 
 from .raster_scatter_dialog import RasterScatterDialog
 
