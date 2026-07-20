@@ -1,7 +1,7 @@
 [general]
 name=Raster Scatter
 description=Plots two raster datasets against each other and fits a linear regression.
-version=1.0.1
+version=1.0.2
 qgisMinimumVersion=4.0
 author=Sim Reaney
 email=sim.reaney@durham.ac.uk
@@ -16,6 +16,8 @@ repository=https://github.com/simreaney/rasterScatter
 homepage=https://github.com/simreaney/rasterScatter
 tags=scatter,plot,histogram,raster,regression
 changelog=
+    1.0.2:
+    - Bug fix
     1.0.1:
     - Plots now automatically update when options are changed. 
     

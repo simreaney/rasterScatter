@@ -18,7 +18,14 @@ from qgis.PyQt.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
 )
-from qgis.core import QgsCoordinateTransform, QgsPointXY, QgsProject, QgsRasterLayer
+from qgis.core import (
+    Qgis,
+    QgsCoordinateTransform,
+    QgsMessageLog,
+    QgsPointXY,
+    QgsProject,
+    QgsRasterLayer,
+)
 
 
 class ScatterPlotWidget(QWidget):
@@ -870,6 +877,17 @@ class RasterScatterDialog(QDialog):
 
         return sampled_value, ok and math.isfinite(sampled_value)
 
+    def _transform_point(self, transform, point):
+        try:
+            return transform.transform(point), True
+        except Exception as exc:
+            QgsMessageLog.logMessage(
+                f"Skipping sample point that failed to reproject: {exc}",
+                "Raster Scatter Plot",
+                level=Qgis.Warning,
+            )
+            return point, False
+
     def _sample_rasters(self, x_layer, y_layer, max_samples):
         x_provider = x_layer.dataProvider()
         y_provider = y_layer.dataProvider()
@@ -903,9 +921,8 @@ class RasterScatterDialog(QDialog):
 
                 sample_point = point
                 if transform is not None:
-                    try:
-                        sample_point = transform.transform(point)
-                    except Exception:
+                    sample_point, transformed_ok = self._transform_point(transform, point)
+                    if not transformed_ok:
                         continue
 
                 y_value, y_ok = self._provider_sample(y_provider, sample_point, 1)
