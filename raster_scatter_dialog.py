@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from qgis.PyQt.QtCore import Qt, QPointF, QRectF
+from qgis.PyQt.QtCore import Qt, QPointF, QRectF, QTimer
 from qgis.PyQt.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
 from qgis.PyQt.QtWidgets import (
     QCheckBox,
@@ -662,13 +662,33 @@ class RasterScatterDialog(QDialog):
         self.legend_checkbox = QCheckBox("Show legend")
         self.legend_checkbox.setChecked(True)
 
-        self.plot_button = QPushButton("Plot")
+        self.plot_button = QPushButton("Resample now")
+        self.plot_button.setToolTip(
+            "The plot updates automatically when options change.\n"
+            "Use this to force an immediate re-sample of the rasters."
+        )
         self.save_button = QPushButton("Save PNG")
         self.close_button = QPushButton("Close")
-        self.result_label = QLabel("Choose two raster layers and click Plot.")
+        self.result_label = QLabel("Choose two raster layers to plot.")
         self.result_label.setWordWrap(True)
 
         self.plot_widget = ScatterPlotWidget()
+
+        # Cached sample data so rendering-only options (bins, colour ramp,
+        # view mode, etc.) can redraw instantly without re-sampling rasters.
+        self._cached_x_values = None
+        self._cached_y_values = None
+        self._cached_slope = None
+        self._cached_intercept = None
+        self._cached_r_squared = None
+        self._cached_x_label = ""
+        self._cached_y_label = ""
+
+        self._needs_resample = False
+        self._auto_update_timer = QTimer(self)
+        self._auto_update_timer.setSingleShot(True)
+        self._auto_update_timer.setInterval(250)
+        self._auto_update_timer.timeout.connect(self._run_auto_update)
 
         self._build_ui()
         self.refresh_layers()
@@ -679,6 +699,19 @@ class RasterScatterDialog(QDialog):
         self.legend_checkbox.toggled.connect(self._on_legend_toggled)
         self.view_mode_combo.currentIndexChanged.connect(self._on_view_mode_changed)
         self._on_view_mode_changed()
+
+        # Options that change which raster pixels are sampled require a
+        # full re-sample; the rest only affect how the cached data is drawn.
+        self.x_combo.currentIndexChanged.connect(self._schedule_full_replot)
+        self.y_combo.currentIndexChanged.connect(self._schedule_full_replot)
+        self.max_samples_spin.valueChanged.connect(self._schedule_full_replot)
+
+        self.plot_type_combo.currentIndexChanged.connect(self._schedule_render_replot)
+        self.bins_spin.valueChanged.connect(self._schedule_render_replot)
+        self.color_ramp_combo.currentIndexChanged.connect(self._schedule_render_replot)
+        self.view_mode_combo.currentIndexChanged.connect(self._schedule_render_replot)
+        self.plot_3d_type_combo.currentIndexChanged.connect(self._schedule_render_replot)
+        self.legend_checkbox.toggled.connect(self._schedule_render_replot)
 
     def _build_ui(self):
         form = QFormLayout()
@@ -757,6 +790,43 @@ class RasterScatterDialog(QDialog):
 
     def _on_legend_toggled(self, checked):
         self.plot_widget.set_legend_enabled(checked)
+
+    def _schedule_full_replot(self, *_args):
+        self._needs_resample = True
+        self._auto_update_timer.start()
+
+    def _schedule_render_replot(self, *_args):
+        if self._cached_x_values is None:
+            return
+        self._auto_update_timer.start()
+
+    def _run_auto_update(self):
+        if self._needs_resample:
+            self._needs_resample = False
+            self.plot_scatter()
+        else:
+            self._render_from_cache()
+
+    def _render_from_cache(self):
+        if self._cached_x_values is None or self._cached_y_values is None:
+            return
+
+        self.plot_widget.set_plot_data(
+            self._cached_x_values,
+            self._cached_y_values,
+            self._cached_slope,
+            self._cached_intercept,
+            self._cached_x_label,
+            self._cached_y_label,
+            "Raster Scatter Plot",
+            plot_type=self.plot_type_combo.currentData(),
+            hist_bins=self.bins_spin.value(),
+            color_ramp=self.color_ramp_combo.currentData(),
+            view_mode=self.view_mode_combo.currentData(),
+            plot_3d_type=self.plot_3d_type_combo.currentData(),
+            legend_enabled=self.legend_checkbox.isChecked(),
+        )
+        self._update_summary_label(self._cached_x_values.size)
 
     def save_plot_png(self):
         if not self.plot_widget.has_plot_data():
@@ -848,6 +918,9 @@ class RasterScatterDialog(QDialog):
         return np.asarray(x_values, dtype=float), np.asarray(y_values, dtype=float)
 
     def plot_scatter(self):
+        self._auto_update_timer.stop()
+        self._needs_resample = False
+
         x_layer = self._selected_layer(self.x_combo)
         y_layer = self._selected_layer(self.y_combo)
 
@@ -871,27 +944,22 @@ class RasterScatterDialog(QDialog):
         total_sum = np.sum((y_values - np.mean(y_values)) ** 2)
         r_squared = 1.0 if total_sum == 0 else 1.0 - (residual_sum / total_sum)
 
-        self.plot_widget.set_plot_data(
-            x_values,
-            y_values,
-            slope,
-            intercept,
-            x_layer.name(),
-            y_layer.name(),
-            "Raster Scatter Plot",
-            plot_type=self.plot_type_combo.currentData(),
-            hist_bins=self.bins_spin.value(),
-            color_ramp=self.color_ramp_combo.currentData(),
-            view_mode=self.view_mode_combo.currentData(),
-            plot_3d_type=self.plot_3d_type_combo.currentData(),
-            legend_enabled=self.legend_checkbox.isChecked(),
-        )
+        self._cached_x_values = x_values
+        self._cached_y_values = y_values
+        self._cached_slope = float(slope)
+        self._cached_intercept = float(intercept)
+        self._cached_r_squared = r_squared
+        self._cached_x_label = x_layer.name()
+        self._cached_y_label = y_layer.name()
 
-        equation = f"y = {slope:.6g}x + {intercept:.6g}"
+        self._render_from_cache()
+
+    def _update_summary_label(self, sample_count):
+        equation = f"y = {self._cached_slope:.6g}x + {self._cached_intercept:.6g}"
         summary = (
             f"{equation}\n"
-            f"R2 = {r_squared:.6g}\n"
-            f"Samples = {x_values.size}\n"
+            f"R2 = {self._cached_r_squared:.6g}\n"
+            f"Samples = {sample_count}\n"
             f"Bins = {self.bins_spin.value()}\n"
             f"Ramp = {self.color_ramp_combo.currentData()}\n"
             f"View = {self.view_mode_combo.currentText()}\n"
