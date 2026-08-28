@@ -669,10 +669,18 @@ class RasterScatterDialog(QDialog):
         self.legend_checkbox = QCheckBox("Show legend")
         self.legend_checkbox.setChecked(True)
 
+        self.auto_refresh_checkbox = QCheckBox("Auto refresh on option change")
+        self.auto_refresh_checkbox.setChecked(True)
+        self.auto_refresh_checkbox.setToolTip(
+            "When enabled, the plot updates automatically whenever an option changes.\n"
+            "When disabled, use \"Resample now\" to update the plot manually."
+        )
+
         self.plot_button = QPushButton("Resample now")
         self.plot_button.setToolTip(
-            "The plot updates automatically when options change.\n"
-            "Use this to force an immediate re-sample of the rasters."
+            "When auto refresh is enabled, the plot updates automatically when options change.\n"
+            "Use this to force an immediate re-sample of the rasters, or to apply\n"
+            "pending option changes while auto refresh is disabled."
         )
         self.save_button = QPushButton("Save PNG")
         self.close_button = QPushButton("Close")
@@ -692,6 +700,7 @@ class RasterScatterDialog(QDialog):
         self._cached_y_label = ""
 
         self._needs_resample = False
+        self._pending_render = False
         self._auto_update_timer = QTimer(self)
         self._auto_update_timer.setSingleShot(True)
         self._auto_update_timer.setInterval(250)
@@ -704,6 +713,7 @@ class RasterScatterDialog(QDialog):
         self.save_button.clicked.connect(self.save_plot_png)
         self.close_button.clicked.connect(self.close)
         self.legend_checkbox.toggled.connect(self._on_legend_toggled)
+        self.auto_refresh_checkbox.toggled.connect(self._on_auto_refresh_toggled)
         self.view_mode_combo.currentIndexChanged.connect(self._on_view_mode_changed)
         self._on_view_mode_changed()
 
@@ -731,6 +741,7 @@ class RasterScatterDialog(QDialog):
         form.addRow("View", self.view_mode_combo)
         form.addRow("3D plot", self.plot_3d_type_combo)
         form.addRow("Legend", self.legend_checkbox)
+        form.addRow("", self.auto_refresh_checkbox)
 
         button_row = QHBoxLayout()
         button_row.addStretch(1)
@@ -798,12 +809,21 @@ class RasterScatterDialog(QDialog):
     def _on_legend_toggled(self, checked):
         self.plot_widget.set_legend_enabled(checked)
 
+    def _on_auto_refresh_toggled(self, checked):
+        if checked and (self._needs_resample or self._pending_render):
+            self._pending_render = False
+            self._auto_update_timer.start()
+
     def _schedule_full_replot(self, *_args):
         self._needs_resample = True
-        self._auto_update_timer.start()
+        if self.auto_refresh_checkbox.isChecked():
+            self._auto_update_timer.start()
 
     def _schedule_render_replot(self, *_args):
         if self._cached_x_values is None:
+            return
+        if not self.auto_refresh_checkbox.isChecked():
+            self._pending_render = True
             return
         self._auto_update_timer.start()
 
@@ -812,6 +832,7 @@ class RasterScatterDialog(QDialog):
             self._needs_resample = False
             self.plot_scatter()
         else:
+            self._pending_render = False
             self._render_from_cache()
 
     def _render_from_cache(self):
@@ -937,6 +958,7 @@ class RasterScatterDialog(QDialog):
     def plot_scatter(self):
         self._auto_update_timer.stop()
         self._needs_resample = False
+        self._pending_render = False
 
         x_layer = self._selected_layer(self.x_combo)
         y_layer = self._selected_layer(self.y_combo)
